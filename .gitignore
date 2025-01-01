@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+**/node_modules/
+/frontend/node_modules
+/frontend/.pnp
+.pnp.js
+
+# Testing
+/coverage
+/frontend/coverage
+
+# Production
+/build
+/frontend/build
+
+# Cache
+.cache
+**/.cache
+**/node_modules/.cache/
+*.pack
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+*.db
+
+# Vercel
+.vercel
