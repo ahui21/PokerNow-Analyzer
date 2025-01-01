@@ -5,7 +5,7 @@ import { CssBaseline } from '@mui/material';
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [mode, setMode] = useState('dark');
+  const [mode, setMode] = useState('light');
 
   const theme = useMemo(
     () =>
@@ -14,22 +14,22 @@ export const ThemeProvider = ({ children }) => {
           mode,
           ...(mode === 'dark' ? {
             primary: {
-              main: '#2196F3',
-              light: '#64B5F6',
-              dark: '#1976D2',
+              main: '#90caf9',
+              light: '#e3f2fd',
+              dark: '#42a5f5',
             },
             background: {
-              default: '#0A1929',
-              paper: '#132f4c',
+              default: '#2d2d2d',
+              paper: 'rgba(66, 66, 66, 0.95)',
             },
             text: {
-              primary: '#fff',
-              secondary: 'rgba(255, 255, 255, 0.7)',
+              primary: 'rgba(255, 255, 255, 0.95)',
+              secondary: 'rgba(255, 255, 255, 0.8)',
             },
             divider: 'rgba(255, 255, 255, 0.12)',
           } : {
             primary: {
-              main: '#1976D2',
+              main: '#1976d2',
               light: '#42a5f5',
               dark: '#1565c0',
             },

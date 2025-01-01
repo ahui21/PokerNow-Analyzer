@@ -98,7 +98,7 @@ function App() {
         >
           <Toolbar sx={{ justifyContent: 'space-between' }}>
             <Typography variant="h6" noWrap>
-              PokerNow Sessions Analyzer
+              PokerNow Analyzer
             </Typography>
             <IconButton
               onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
