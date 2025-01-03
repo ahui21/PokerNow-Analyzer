@@ -29,12 +29,18 @@ supabase_service = SupabaseService()
 async def get_sessions():
     try:
         print("Attempting to fetch sessions...")
+        print("Environment check:")
+        print("SUPABASE_URL exists:", bool(os.getenv('SUPABASE_URL')))
+        print("SUPABASE_KEY exists:", bool(os.getenv('SUPABASE_KEY')))
+        print("SUPABASE_URL value:", os.getenv('SUPABASE_URL'))  # Safe to print URL
         sessions = await supabase_service.get_sessions()
         print(f"Successfully fetched {len(sessions)} sessions")
         return sessions
     except Exception as e:
-        print(f"Error in get_sessions: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        error_msg = f"Error in get_sessions: {str(e)}"
+        print(error_msg)
+        print("Full error details:", e)
+        return {"status": "error", "message": error_msg}
 
 @app.get("/")
 async def root():
