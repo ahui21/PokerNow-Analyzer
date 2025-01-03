@@ -14,12 +14,7 @@ app = FastAPI()
 # Update CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://www.pokernowanalyzer.com",
-        "https://pokernowanalyzer.com",
-        "https://pokernow-analyzer-pswnfq4ur-alwins-projects-7d50617f.vercel.app"
-    ],
+    allow_origins=["*"],  # More permissive for testing
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
