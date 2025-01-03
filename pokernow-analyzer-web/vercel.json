@@ -2,12 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/app.py",
-      "use": "@vercel/python",
-      "config": {
-        "runtime": "python3.9",
-        "maxLambdaSize": "15mb"
-      }
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
     },
     {
       "src": "frontend/package.json",
@@ -17,15 +13,20 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/app.py"
+      "src": "/api/healthcheck",
+      "dest": "/api/healthcheck/index.py"
+    },
+    {
+      "src": "/api/test",
+      "dest": "/api/test/index.py"
+    },
+    {
+      "src": "/api/sessions",
+      "dest": "/api/sessions/index.py"
     },
     {
       "src": "/(.*)",
       "dest": "/frontend/build/$1"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "./api"
-  }
+  ]
 } 
