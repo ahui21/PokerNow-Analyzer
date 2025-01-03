@@ -44,6 +44,15 @@ class SupabaseService:
         except Exception as e:
             raise Exception(f"Error checking file existence: {str(e)}")
 
+    def format_date(self, date_str):
+        try:
+            # Parse the date string and format it consistently
+            date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return date_obj.isoformat()
+        except Exception as e:
+            print(f"Error formatting date {date_str}: {e}")
+            return date_str
+
     async def get_sessions(self):
         """Get all sessions."""
         try:
@@ -68,8 +77,8 @@ class SupabaseService:
                         'display_name': f"{start_time_pst.strftime('%B %-d, %Y %-I:%M%p')}",
                         'file_id': session['file_name'],
                         'upload_date': upload_time_pst.strftime('%B %-d, %Y %-I:%M%p'),
-                        'start_time': start_time_pst.isoformat(),
-                        'end_time': session['end_time'],
+                        'start_time': self.format_date(session['start_time']),
+                        'end_time': self.format_date(session['end_time']),
                         'is_active': session['active'],
                         'tags': session['tags'] or [],
                         'players': [],

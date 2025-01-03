@@ -9,10 +9,13 @@ from pydantic import BaseModel, validator
 
 app = FastAPI()
 
-# Configure CORS
+# Update CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://your-frontend-domain.com"  # Add your frontend's production domain
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

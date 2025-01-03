@@ -64,6 +64,8 @@ const TRANSITIONS = {
   expand: 'max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
 };
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
 const SessionsManager = () => {
   const { mode, setMode } = useTheme();
   const [sessions, setSessions] = useState([]);
@@ -165,7 +167,12 @@ const SessionsManager = () => {
   const fetchSessions = async () => {
     try {
       console.log('Fetching sessions...');
-      const response = await axios.get('http://localhost:5001/sessions');
+      const response = await axios.get(`${API_URL}/sessions`, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        withCredentials: false
+      });
       console.log('Sessions response:', response.data);
       if (!Array.isArray(response.data)) {
         console.error('Expected array but got:', typeof response.data);
@@ -192,7 +199,7 @@ const SessionsManager = () => {
       const formData = new FormData();
       files.forEach(file => formData.append('files', file));  // Note: 'files' matches FastAPI parameter name
 
-      const response = await axios.post('http://localhost:5001/upload', formData, {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -229,7 +236,7 @@ const SessionsManager = () => {
   const handleToggleActive = async (sessionId, currentStatus) => {
     try {
       console.log(`Toggling session ${sessionId} from ${currentStatus} to ${!currentStatus}`);
-      const response = await axios.post(`http://localhost:5001/sessions/${sessionId}/toggle-active`, {
+      const response = await axios.post(`${API_URL}/sessions/${sessionId}/toggle-active`, {
         active: !currentStatus
       });
       
@@ -266,7 +273,7 @@ const SessionsManager = () => {
         throw new Error('No session selected');
       }
 
-      const response = await axios.post(`http://localhost:5001/sessions/${selectedSession.id}/tags`, {
+      const response = await axios.post(`${API_URL}/sessions/${selectedSession.id}/tags`, {
         tag: tagToAdd
       });
       
@@ -292,7 +299,7 @@ const SessionsManager = () => {
 
   const handleRemoveTag = async (sessionId, tag) => {
     try {
-      const response = await axios.delete(`http://localhost:5001/sessions/${sessionId}/tags/${tag}`);
+      const response = await axios.delete(`${API_URL}/sessions/${sessionId}/tags/${tag}`);
       
       if (response.data.status === 'success') {
         // Update local state
@@ -519,7 +526,7 @@ const SessionsManager = () => {
       // Log the full request configuration
       const config = {
         method: 'POST',
-        url: 'http://localhost:5001/sessions/bulk/tags',
+        url: `${API_URL}/sessions/bulk/tags`,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -561,7 +568,7 @@ const SessionsManager = () => {
       
       // Process each session in parallel
       const promises = selectedSessions.map(sessionId => 
-        axios.post(`http://localhost:5001/sessions/${sessionId}/toggle-active`, {
+        axios.post(`${API_URL}/sessions/${sessionId}/toggle-active`, {
           active: makeVisible
         })
       );
