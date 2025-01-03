@@ -1,0 +1,9 @@
+{
+  "devCommand": "uvicorn index:app --reload",
+  "builds": [
+    {
+      "src": "index.py",
+      "use": "@vercel/python"
+    }
+  ]
+} 
