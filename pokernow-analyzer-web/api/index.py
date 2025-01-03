@@ -1,63 +1,15 @@
-from fastapi import FastAPI, UploadFile, File, Body, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
+from mangum import Adapter
 import os
-from tempfile import NamedTemporaryFile
-from typing import List, Union
-from services.file_processor import FileProcessor
-from services.supabase_service import SupabaseService
-from pydantic import BaseModel, validator
-from datetime import datetime
 
 app = FastAPI()
 
-# Debug: Print environment variables (excluding sensitive data)
-print("SUPABASE_URL exists:", bool(os.getenv('SUPABASE_URL')))
-print("SUPABASE_KEY exists:", bool(os.getenv('SUPABASE_KEY')))
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
-file_processor = FileProcessor()
-supabase_service = SupabaseService()
-
-@app.get("/sessions")
-async def get_sessions():
-    try:
-        print("Attempting to fetch sessions...")
-        print("Environment check:")
-        print("SUPABASE_URL exists:", bool(os.getenv('SUPABASE_URL')))
-        print("SUPABASE_KEY exists:", bool(os.getenv('SUPABASE_KEY')))
-        print("SUPABASE_URL value:", os.getenv('SUPABASE_URL'))  # Safe to print URL
-        sessions = await supabase_service.get_sessions()
-        print(f"Successfully fetched {len(sessions)} sessions")
-        return sessions
-    except Exception as e:
-        error_msg = f"Error in get_sessions: {str(e)}"
-        print(error_msg)
-        print("Full error details:", e)
-        return {"status": "error", "message": error_msg}
-
-@app.get("/")
-async def root():
-    return {"message": "API root is working"}
-
-@app.get("/test")
-async def test():
-    return {"message": "Test endpoint working!"}
-
-@app.get("/healthcheck")
-async def healthcheck():
+@app.get("/api/debug")
+async def debug():
     return {
-        "status": "ok",
-        "message": "Backend is running",
-        "timestamp": str(datetime.now())
+        "supabase_url_exists": bool(os.getenv('SUPABASE_URL')),
+        "supabase_key_exists": bool(os.getenv('SUPABASE_KEY')),
+        "supabase_url": os.getenv('SUPABASE_URL')
     }
 
-# This is required for Vercel
-from mangum import Adapter
 handler = Adapter(app) 
