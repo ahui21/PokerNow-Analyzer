@@ -181,6 +181,7 @@ const SessionsManager = () => {
 
   const fetchSessions = async () => {
     try {
+      console.log('API URL:', process.env.REACT_APP_API_URL);
       console.log('Fetching sessions...');
       const response = await axios.get(`${API_URL}/sessions`, {
         headers: {
@@ -200,6 +201,8 @@ const SessionsManager = () => {
       updateAllTagsAndPlayers(response.data);
     } catch (err) {
       console.error('Error fetching sessions:', err);
+      console.error('API URL used:', API_URL);
+      console.error('Full request URL:', `${API_URL}/sessions`);
       setError(`Error fetching sessions: ${err.response?.data?.message || err.message}`);
     }
   };
