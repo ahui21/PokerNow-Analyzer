@@ -10,6 +10,10 @@ from datetime import datetime
 
 app = FastAPI()
 
+# Debug: Print environment variables (excluding sensitive data)
+print("SUPABASE_URL exists:", bool(os.getenv('SUPABASE_URL')))
+print("SUPABASE_KEY exists:", bool(os.getenv('SUPABASE_KEY')))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,6 +24,17 @@ app.add_middleware(
 
 file_processor = FileProcessor()
 supabase_service = SupabaseService()
+
+@app.get("/sessions")
+async def get_sessions():
+    try:
+        print("Attempting to fetch sessions...")
+        sessions = await supabase_service.get_sessions()
+        print(f"Successfully fetched {len(sessions)} sessions")
+        return sessions
+    except Exception as e:
+        print(f"Error in get_sessions: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/")
 async def root():
