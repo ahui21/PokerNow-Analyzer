@@ -16,13 +16,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://www.pokernowanalyzer.com",  # Your production domain
-        "https://pokernowanalyzer.com",      # Non-www version
-        "https://pokernow-analyzer-pswnfq4ur-alwins-projects-7d50617f.vercel.app"  # Vercel preview URL
+        "https://www.pokernowanalyzer.com",
+        "https://pokernowanalyzer.com",
+        "https://pokernow-analyzer-pswnfq4ur-alwins-projects-7d50617f.vercel.app"
     ],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 file_processor = FileProcessor()
