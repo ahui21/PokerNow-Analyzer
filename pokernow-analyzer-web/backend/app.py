@@ -97,9 +97,12 @@ async def upload_files(files: List[UploadFile] = File(...)):
 @app.get("/sessions")
 async def get_sessions():
     try:
+        print("Received request for sessions")
         sessions = await supabase_service.get_sessions()
+        print(f"Successfully fetched {len(sessions)} sessions")
         return sessions
     except Exception as e:
+        print(f"Error in get_sessions: {str(e)}")
         return {"status": "error", "message": str(e)}
 
 @app.post("/sessions/bulk/tags")
