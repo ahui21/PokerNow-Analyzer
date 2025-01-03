@@ -14,7 +14,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://your-frontend-domain.com"  # Add your frontend's production domain
+        "https://www.pokernowanalyzer.com",  # Your production domain
+        "https://pokernowanalyzer.com",      # Non-www version
+        "https://pokernow-analyzer-pswnfq4ur-alwins-projects-7d50617f.vercel.app"  # Vercel preview URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
