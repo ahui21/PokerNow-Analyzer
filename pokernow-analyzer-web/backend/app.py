@@ -143,3 +143,7 @@ async def toggle_session_active(session_id: int, update: ActiveUpdate):
     except Exception as e:
         print(f"Error in toggle endpoint: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+@app.get("/healthcheck")
+async def healthcheck():
+    return {"status": "ok"}

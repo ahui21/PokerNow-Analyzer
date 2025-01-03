@@ -169,7 +169,9 @@ const SessionsManager = () => {
       console.log('Fetching sessions...');
       const response = await axios.get(`${API_URL}/sessions`, {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Access-Control-Allow-Origin': '*'
         },
         withCredentials: false
       });
