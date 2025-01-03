@@ -1,7 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
+import os
+from tempfile import NamedTemporaryFile
+from typing import List, Union
+from services.file_processor import FileProcessor
+from services.supabase_service import SupabaseService
+from pydantic import BaseModel, validator
 from datetime import datetime
-import json
 
 app = FastAPI()
 
@@ -10,21 +15,28 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-@app.get("/api")
+file_processor = FileProcessor()
+supabase_service = SupabaseService()
+
+@app.get("/")
 async def root():
     return {"message": "API root is working"}
 
-@app.get("/api/test")
+@app.get("/test")
 async def test():
     return {"message": "Test endpoint working!"}
 
-@app.get("/api/healthcheck")
+@app.get("/healthcheck")
 async def healthcheck():
     return {
         "status": "ok",
         "message": "Backend is running",
         "timestamp": str(datetime.now())
-    } 
+    }
+
+# This is required for Vercel
+from mangum import Adapter
+handler = Adapter(app) 
