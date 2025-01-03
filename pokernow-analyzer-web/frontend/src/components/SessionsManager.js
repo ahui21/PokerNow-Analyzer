@@ -145,9 +145,16 @@ const SessionsManager = () => {
           table_sizes: {}
         };
       }
+      // Check if statsString is already an object
+      if (typeof statsString === 'object' && statsString !== null) {
+        return statsString;
+      }
       return JSON.parse(statsString);
     } catch (e) {
-      console.error('Error parsing game stats:', e);
+      // Only log error if statsString is not empty and not undefined
+      if (statsString) {
+        console.debug('Error parsing game stats:', e);  // Changed to debug level
+      }
       return {
         game_types: {},
         table_sizes: {}
@@ -160,14 +167,16 @@ const SessionsManager = () => {
       console.log('Fetching sessions...');
       const response = await axios.get('http://localhost:5001/sessions');
       console.log('Sessions response:', response.data);
-      const sortedSessions = response.data.sort((a, b) => {
-        return new Date(b.start_time) - new Date(a.start_time);
-      });
-      setSessions(sortedSessions);
-      updateAllTagsAndPlayers(sortedSessions);
-    } catch (error) {
-      console.error('Error fetching sessions:', error);
-      setError('Error fetching sessions');
+      if (!Array.isArray(response.data)) {
+        console.error('Expected array but got:', typeof response.data);
+        setError('Invalid response format from server');
+        return;
+      }
+      setSessions(response.data);
+      updateAllTagsAndPlayers(response.data);
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+      setError(`Error fetching sessions: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -175,52 +184,37 @@ const SessionsManager = () => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
 
-    console.log(`Attempting to upload ${files.length} files:`, files.map(f => f.name));
     setLoading(true);
     setError(null);
     setUploadSuccess(null);
 
     try {
       const formData = new FormData();
-      files.forEach(file => formData.append('file', file));
+      files.forEach(file => formData.append('files', file));  // Note: 'files' matches FastAPI parameter name
 
-      console.log('Sending upload request...');
       const response = await axios.post('http://localhost:5001/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      console.log('Received response:', response.data);
-      const results = response.data;
-      const messages = [];
-
-      if (Array.isArray(results.processed) && results.processed.length > 0) {
-        messages.push(`Successfully processed: ${results.processed.join(', ')}`);
-      }
-
-      if (Array.isArray(results.skipped) && results.skipped.length > 0) {
-        messages.push(`Already uploaded (skipped): ${results.skipped.join(', ')}`);
-      }
-
-      if (Array.isArray(results.failed) && results.failed.length > 0) {
-        const failedMessages = results.failed.map(f => `${f.filename}: ${f.error}`);
-        messages.push(`Failed to process: ${failedMessages.join(', ')}`);
-      }
-
-      console.log('Status:', results.status);
-      console.log('Messages:', messages);
-
-      if (results.status === 'success') {
-        setUploadSuccess(messages.join('\n'));
+      if (response.data.status === 'success') {
+        setUploadSuccess(
+          `Successfully processed: ${response.data.processed.join(', ')}\n` +
+          (response.data.skipped.length ? `Skipped (already exists): ${response.data.skipped.join(', ')}\n` : '')
+        );
+        // Refresh the sessions list
         fetchSessions();
       } else {
-        setError(messages.join('\n') || 'No files were processed successfully');
+        setError(
+          `Failed to process files:\n${response.data.failed.map(f => 
+            `${f.filename}: ${f.error}`
+          ).join('\n')}`
+        );
       }
     } catch (err) {
       console.error('Upload error:', err);
-      console.error('Error response:', err.response);
-      setError('Error uploading files: ' + (err.response?.data?.message || err.message));
+      setError(`Error uploading files: ${err.response?.data?.message || err.message}`);
     } finally {
       setLoading(false);
       event.target.value = null; // Reset file input
@@ -228,74 +222,89 @@ const SessionsManager = () => {
   };
 
   const handleDeleteSession = async (sessionId) => {
-    if (!window.confirm('Are you sure you want to delete this session?')) {
-      return;
-    }
-    
-    try {
-      console.log(`Deleting session ${sessionId}`);
-      const response = await axios.delete(`http://localhost:5001/sessions/${sessionId}`);
-      console.log('Delete response:', response.data);
-      setSelectedSessions(prev => prev.filter(id => id !== sessionId));
-      fetchSessions();
-    } catch (err) {
-      console.error('Error deleting session:', err);
-      setError('Error deleting session: ' + (err.response?.data?.message || err.message));
-    }
+    console.log('Mock: Deleting session', sessionId);
+    setSelectedSessions(prev => prev.filter(id => id !== sessionId));
   };
 
   const handleToggleActive = async (sessionId, currentStatus) => {
     try {
-      console.log(`Toggling session ${sessionId} visibility from ${currentStatus} to ${!currentStatus}`);
-      const response = await axios.patch(
-        `http://localhost:5001/sessions/${sessionId}/active`,
-        { is_active: !currentStatus },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      console.log(`Toggling session ${sessionId} from ${currentStatus} to ${!currentStatus}`);
+      const response = await axios.post(`http://localhost:5001/sessions/${sessionId}/toggle-active`, {
+        active: !currentStatus
+      });
+      
       console.log('Toggle response:', response.data);
+      
       if (response.data.status === 'success') {
-        // Update local state immediately
-        setSessions(prev => prev.map(session => 
-          session.id === sessionId 
-            ? { ...session, is_active: !currentStatus }
-            : session
-        ));
+        console.log('Updating local state...');
+        setSessions(prev => {
+          const newSessions = prev.map(session => {
+            if (session.id === sessionId) {
+              console.log(`Updating session ${sessionId} is_active from ${session.is_active} to ${!currentStatus}`);
+              return { ...session, is_active: !currentStatus };
+            }
+            return session;
+          });
+          console.log('New sessions state:', newSessions);
+          return newSessions;
+        });
       } else {
-        throw new Error(response.data.message || 'Failed to update visibility');
+        throw new Error(response.data.message);
       }
     } catch (err) {
-      console.error('Error toggling visibility:', err);
-      setError('Error updating visibility: ' + (err.response?.data?.message || err.message));
+      console.error('Error toggling session visibility:', err);
+      setError(`Error toggling session visibility: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleAddTag = async (tagToAdd) => {
-    if (!tagToAdd || !selectedSession) return;
-
     try {
-      await axios.post(`http://localhost:5001/sessions/${selectedSession.id}/tags`, {
-        tag: tagToAdd.trim()
+      console.log('Selected session:', selectedSession);
+      console.log('Adding tag:', tagToAdd);
+      
+      if (!selectedSession) {
+        throw new Error('No session selected');
+      }
+
+      const response = await axios.post(`http://localhost:5001/sessions/${selectedSession.id}/tags`, {
+        tag: tagToAdd
       });
-      setNewTag('');
-      setTagDialogOpen(false);
-      fetchSessions();
+      
+      if (response.data.status === 'success') {
+        // Update local state - Fixed: use the tag string directly
+        setSessions(prev => prev.map(session =>
+          session.id === selectedSession.id
+            ? { ...session, tags: Array.from(new Set([...(session.tags || []), tagToAdd])) }
+            : session
+        ));
+        
+        // Update allTags if it's a new tag
+        setAllTags(prev => prev.includes(tagToAdd) ? prev : [...prev, tagToAdd]);
+      }
     } catch (err) {
-      setError('Error adding tag: ' + err.message);
+      console.error('Error adding tag:', err);
+      setError(`Error adding tag: ${err.response?.data?.message || err.message}`);
     }
+    setNewTag('');
+    setTagDialogOpen(false);
+    setSelectedSession(null);
   };
 
   const handleRemoveTag = async (sessionId, tag) => {
     try {
-      await axios.delete(`http://localhost:5001/sessions/${sessionId}/tags/${encodeURIComponent(tag)}`);
-      setError(null);
-      fetchSessions();
+      const response = await axios.delete(`http://localhost:5001/sessions/${sessionId}/tags/${tag}`);
+      
+      if (response.data.status === 'success') {
+        // Update local state
+        setSessions(prev => prev.map(session =>
+          session.id === sessionId
+            ? { ...session, tags: session.tags.filter(t => t !== tag) }
+            : session
+        ));
+      }
     } catch (err) {
-      setError('Error removing tag: ' + (err.response?.data?.message || err.message));
-      console.error('Remove tag error:', err);
+      console.error('Error removing tag:', err);
+      setError(`Error removing tag: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -305,15 +314,19 @@ const SessionsManager = () => {
   };
 
   const getFilteredAndSortedSessions = (sessions) => {
+    if (!sessions || !Array.isArray(sessions)) {
+      return [];
+    }
+
     return sessions.filter(session => {
-      // Filter by tags
+      // Filter by tags (OR logic)
       if (selectedTags.length > 0) {
-        if (!session.tags || !selectedTags.every(tag => session.tags.includes(tag))) {
+        if (!session.tags || !selectedTags.some(tag => session.tags.includes(tag))) {
           return false;
         }
       }
 
-      // Filter by players
+      // Filter by players (OR logic)
       if (selectedPlayers.length > 0) {
         const sessionPlayers = Array.isArray(session.players) ? session.players : [];
         if (!selectedPlayers.some(player => sessionPlayers.includes(player))) {
@@ -321,7 +334,7 @@ const SessionsManager = () => {
         }
       }
 
-      // Filter by table size
+      // Filter by table size (OR logic)
       if (filters.tableSizes.length > 0) {
         try {
           const stats = parseGameStats(session.game_stats);
@@ -330,12 +343,12 @@ const SessionsManager = () => {
             return false;
           }
         } catch (e) {
-          console.error('Error parsing table sizes:', e);
+          console.debug('Error parsing table sizes:', e);
           return false;
         }
       }
 
-      // Filter by game type
+      // Filter by game type (OR logic)
       if (filters.gameTypes.length > 0) {
         try {
           const stats = parseGameStats(session.game_stats);
@@ -344,26 +357,50 @@ const SessionsManager = () => {
             return false;
           }
         } catch (e) {
-          console.error('Error parsing game types:', e);
+          console.debug('Error parsing game types:', e);
           return false;
         }
       }
 
       return true;
     }).sort((a, b) => {
-      // Sort by date
-      return new Date(b.start_time) - new Date(a.start_time);
+      // Update sort logic to use sortBy and sortOrder
+      const aValue = sortBy === 'session_date' ? a.start_time : a.upload_date;
+      const bValue = sortBy === 'session_date' ? b.start_time : b.upload_date;
+      
+      // Convert to dates for comparison
+      const dateA = new Date(aValue);
+      const dateB = new Date(bValue);
+      
+      // Apply sort order
+      return sortOrder === 'desc' 
+        ? dateB - dateA  // Newest first
+        : dateA - dateB; // Oldest first
     });
   };
 
   const filteredSessions = getFilteredAndSortedSessions(sessions);
 
   const filterButtonStyle = { 
-    width: 100,
+    width: 130,
+    height: '36px',
   };
 
-  const wideFilterButtonStyle = {
-    width: 150,
+  const playerButtonStyle = {
+    width: 110,
+    height: '36px',
+  };
+
+  const tagButtonStyle = {
+    width: 83,
+    height: '36px',
+  };
+
+  const filterSelectStyle = {
+    height: '40px',
+    '& .MuiSelect-select': {
+      padding: '8px 14px',
+    }
   };
 
   const renderFilterControls = () => (
@@ -394,24 +431,26 @@ const SessionsManager = () => {
         </Button>
       )}
 
-      <FormControl size="small" sx={{ minWidth: 120 }}>
+      <FormControl sx={{ width: 150 }}>
         <InputLabel>Sort By</InputLabel>
         <Select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
           input={<OutlinedInput label="Sort By" />}
+          sx={{ height: '36px' }}
         >
           <MenuItem value="session_date">Session Date</MenuItem>
           <MenuItem value="upload_date">Upload Date</MenuItem>
         </Select>
       </FormControl>
 
-      <FormControl size="small" sx={{ minWidth: 100 }}>
+      <FormControl sx={{ width: 150 }}>
         <InputLabel>Order</InputLabel>
         <Select
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
           input={<OutlinedInput label="Order" />}
+          sx={{ height: '36px' }}
         >
           <MenuItem value="desc">Newest First</MenuItem>
           <MenuItem value="asc">Oldest First</MenuItem>
@@ -423,7 +462,7 @@ const SessionsManager = () => {
         variant="outlined"
         onClick={(event) => setGameTypeAnchorEl(event.currentTarget)}
         endIcon={<FilterListIcon />}
-        sx={wideFilterButtonStyle}
+        sx={filterButtonStyle}
       >
         Game Type
       </Button>
@@ -433,7 +472,7 @@ const SessionsManager = () => {
         variant="outlined"
         onClick={(event) => setTableSizeAnchorEl(event.currentTarget)}
         endIcon={<FilterListIcon />}
-        sx={wideFilterButtonStyle}
+        sx={filterButtonStyle}
       >
         Table Size
       </Button>
@@ -443,7 +482,7 @@ const SessionsManager = () => {
         variant="outlined"
         onClick={(event) => setPlayersAnchorEl(event.currentTarget)}
         endIcon={<FilterListIcon />}
-        sx={filterButtonStyle}
+        sx={playerButtonStyle}
       >
         Players
       </Button>
@@ -453,7 +492,7 @@ const SessionsManager = () => {
         onClick={(event) => setFilterAnchorEl(event.currentTarget)}
         variant="outlined"
         size="small"
-        sx={filterButtonStyle}
+        sx={tagButtonStyle}
       >
         Tags
       </Button>
@@ -462,52 +501,92 @@ const SessionsManager = () => {
 
   const handleBulkAddTag = async (tag) => {
     try {
-      await Promise.all(
-        selectedSessions.map(sessionId =>
-          axios.post(`http://localhost:5001/sessions/${sessionId}/tags`, { tag })
-        )
-      );
-      await fetchSessions();
-      setTagDialogOpen(false);
-      setNewTag('');
-      setSelectedSessions([]);
+      console.log('Bulk adding tag:', tag);
+      console.log('Selected sessions:', selectedSessions);
+      
+      if (!tag || !selectedSessions.length) {
+        throw new Error('No tag or sessions selected');
+      }
+
+      // Make sure session IDs are numbers and tag is trimmed
+      const requestData = {
+        session_ids: selectedSessions.map(id => parseInt(id, 10)),  // Ensure integers
+        tag: tag.trim()
+      };
+      
+      console.log('Request data:', JSON.stringify(requestData, null, 2));
+      
+      // Log the full request configuration
+      const config = {
+        method: 'POST',
+        url: 'http://localhost:5001/sessions/bulk/tags',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: requestData
+      };
+      
+      console.log('Request config:', JSON.stringify(config, null, 2));
+      
+      const response = await axios(config);
+      
+      if (response.data.status === 'success') {
+        // Update local state
+        setSessions(prev => prev.map(session =>
+          selectedSessions.includes(session.id)
+            ? { ...session, tags: Array.from(new Set([...(session.tags || []), tag])) }
+            : session
+        ));
+        
+        // Update allTags if it's a new tag
+        setAllTags(prev => prev.includes(tag) ? prev : [...prev, tag]);
+      }
     } catch (err) {
-      setError('Error adding tags: ' + err.message);
+      console.error('Error in bulk tag operation:', err);
+      if (err.response) {
+        console.error('Response data:', JSON.stringify(err.response.data, null, 2));
+        console.error('Response status:', err.response.status);
+        console.error('Response headers:', err.response.headers);
+      }
+      setError(`Error adding tags: ${err.response?.data?.detail?.[0]?.msg || err.message}`);
     }
+    setTagDialogOpen(false);
+    setNewTag('');
+    setSelectedSessions([]);
   };
 
   const handleBulkToggleVisibility = async (makeVisible) => {
     try {
-      await Promise.all(
-        selectedSessions.map(sessionId =>
-          axios.patch(`http://localhost:5001/sessions/${sessionId}/active`, {
-            is_active: makeVisible
-          })
-        )
+      console.log(`Bulk toggling visibility to ${makeVisible} for sessions:`, selectedSessions);
+      
+      // Process each session in parallel
+      const promises = selectedSessions.map(sessionId => 
+        axios.post(`http://localhost:5001/sessions/${sessionId}/toggle-active`, {
+          active: makeVisible
+        })
       );
-      await fetchSessions();
-      setSelectedSessions([]); // Clear selection after action
+      
+      const results = await Promise.all(promises);
+      console.log('Bulk toggle results:', results);
+      
+      // Update local state
+      setSessions(prev => prev.map(session => 
+        selectedSessions.includes(session.id)
+          ? { ...session, is_active: makeVisible }
+          : session
+      ));
+      
+      // Clear selection
+      setSelectedSessions([]);
     } catch (err) {
-      setError('Error updating visibility: ' + err.message);
+      console.error('Error in bulk toggle visibility:', err);
+      setError(`Error toggling session visibility: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${selectedSessions.length} sessions?`)) {
-      return;
-    }
-    
-    try {
-      await Promise.all(
-        selectedSessions.map(sessionId =>
-          axios.delete(`http://localhost:5001/sessions/${sessionId}`)
-        )
-      );
-      await fetchSessions();
-      setSelectedSessions([]); // Clear selection after deletion
-    } catch (err) {
-      setError('Error deleting sessions: ' + err.message);
-    }
+    console.log('Mock: Bulk deleting sessions', selectedSessions);
+    setSelectedSessions([]);
   };
 
   const handleSelectAll = (checked) => {
@@ -811,32 +890,40 @@ const SessionsManager = () => {
             Clear Tag Filters
           </MenuItem>
           <Divider />
-          {allTags.map(tag => (
-            <MenuItem 
-              key={tag}
-              onClick={() => {
-                if (selectedTags.includes(tag)) {
-                  setSelectedTags(selectedTags.filter(t => t !== tag));
-                } else {
-                  setSelectedTags([...selectedTags, tag]);
-                }
-              }}
-            >
-              <Checkbox 
-                checked={selectedTags.includes(tag)}
-                size="small"
-              />
-              <Chip
-                label={tag}
-                size="small"
-                sx={{
-                  backgroundColor: getTagColor(tag),
-                  color: 'white',
-                  ml: 1
-                }}
-              />
-            </MenuItem>
-          ))}
+          {allTags.length > 0 ? (
+            allTags.map(tag => (
+              <MenuItem key={tag} dense>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={selectedTags.includes(tag)}
+                      onChange={() => {
+                        setSelectedTags(prev =>
+                          prev.includes(tag)
+                            ? prev.filter(t => t !== tag)
+                            : [...prev, tag]
+                        );
+                      }}
+                    />
+                  }
+                  label={
+                    <Chip
+                      label={tag}
+                      size="small"
+                      sx={{
+                        backgroundColor: getTagColor(tag),
+                        color: 'white',
+                        pointerEvents: 'none'
+                      }}
+                    />
+                  }
+                  style={{ width: '100%' }}
+                />
+              </MenuItem>
+            ))
+          ) : (
+            <MenuItem disabled>No tags found</MenuItem>
+          )}
         </Menu>
 
         <List sx={{ pt: 0 }}>
@@ -1015,7 +1102,7 @@ const SessionsManager = () => {
                     }}
                   >
                     <Typography component="span" variant="subtitle1" sx={{ fontWeight: 500 }}>
-                      Uploaded: {new Date(session.start_time).toLocaleString()}
+                      Uploaded: {session.upload_date}
                     </Typography>
                     
                     <Box 
@@ -1084,8 +1171,10 @@ const SessionsManager = () => {
               <ListItemSecondaryAction>
                 <IconButton
                   edge="end"
-                  onClick={() => {
-                    setSelectedSession(session);
+                  onClick={(e) => {
+                    e.stopPropagation();  // Prevent row selection
+                    console.log('Clicked tag button for session:', session);  // Add this log
+                    setSelectedSession(session);  // Set the selected session
                     setTagDialogOpen(true);
                   }}
                 >
@@ -1143,12 +1232,12 @@ const SessionsManager = () => {
                     key={tag}
                     label={tag}
                     onClick={() => {
+                      console.log('Clicked existing tag:', tag);  // Add this log
                       if (selectedSessions.length > 0) {
                         handleBulkAddTag(tag);
                       } else {
                         handleAddTag(tag);
                       }
-                      setTagDialogOpen(false);
                     }}
                     sx={{
                       backgroundColor: getTagColor(tag),
@@ -1179,6 +1268,10 @@ const SessionsManager = () => {
           </Button>
           <Button 
             onClick={() => {
+              console.log('Add button clicked');
+              console.log('Selected sessions:', selectedSessions);
+              console.log('New tag:', newTag);
+              
               if (selectedSessions.length > 0) {
                 handleBulkAddTag(newTag);
               } else {
@@ -1186,6 +1279,7 @@ const SessionsManager = () => {
               }
             }} 
             color="primary"
+            disabled={!newTag.trim()}
           >
             Add
           </Button>

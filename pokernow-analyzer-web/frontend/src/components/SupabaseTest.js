@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Box, Typography, Alert, CircularProgress } from '@mui/material';
-import config from '../config';
+import { Box, Typography, Alert, CircularProgress, Paper } from '@mui/material';
 
-// Log the environment variables (remove in production)
-console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
-console.log('Supabase Key:', process.env.REACT_APP_SUPABASE_ANON_KEY?.slice(0, 10) + '...');
-
+// Initialize Supabase client
 const supabase = createClient(
-  config.supabaseUrl,
-  config.supabaseKey
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
 );
 
 const SupabaseTest = () => {
@@ -20,13 +16,18 @@ const SupabaseTest = () => {
   useEffect(() => {
     async function testConnection() {
       try {
+        console.log('Testing Supabase connection...');
+        
         // Try to fetch sessions
         const { data: sessions, error: sessionsError } = await supabase
           .from('sessions')
           .select('*')
           .limit(5);
 
-        if (sessionsError) throw sessionsError;
+        if (sessionsError) {
+          console.error('Sessions error:', sessionsError);
+          throw sessionsError;
+        }
 
         // Try to fetch players
         const { data: players, error: playersError } = await supabase
@@ -34,13 +35,17 @@ const SupabaseTest = () => {
           .select('*')
           .limit(5);
 
-        if (playersError) throw playersError;
+        if (playersError) {
+          console.error('Players error:', playersError);
+          throw playersError;
+        }
 
         setData({
           sessions: sessions || [],
           players: players || []
         });
       } catch (err) {
+        console.error('Connection error:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -58,35 +63,35 @@ const SupabaseTest = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">
-          Connection Error: {error}
-        </Alert>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
-      <Alert severity="success" sx={{ mb: 2 }}>
-        Successfully connected to Supabase!
-      </Alert>
-      
-      <Typography variant="h6" gutterBottom>
-        Sessions ({data.sessions.length})
-      </Typography>
-      <pre>
-        {JSON.stringify(data.sessions, null, 2)}
-      </pre>
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Connection Error: {error}
+        </Alert>
+      ) : (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Successfully connected to Supabase!
+        </Alert>
+      )}
 
-      <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-        Players ({data.players.length})
-      </Typography>
-      <pre>
-        {JSON.stringify(data.players, null, 2)}
-      </pre>
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Sessions ({data?.sessions?.length || 0})
+        </Typography>
+        <pre style={{ overflow: 'auto', maxHeight: '200px' }}>
+          {JSON.stringify(data?.sessions, null, 2)}
+        </pre>
+      </Paper>
+
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Players ({data?.players?.length || 0})
+        </Typography>
+        <pre style={{ overflow: 'auto', maxHeight: '200px' }}>
+          {JSON.stringify(data?.players, null, 2)}
+        </pre>
+      </Paper>
     </Box>
   );
 };
