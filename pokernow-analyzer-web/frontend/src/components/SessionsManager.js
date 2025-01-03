@@ -113,6 +113,21 @@ const SessionsManager = () => {
     fetchSessions();
   }, []);
 
+  useEffect(() => {
+    // Test backend connection
+    const testBackend = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/healthcheck`);
+        console.log('Backend health check:', response.data);
+      } catch (err) {
+        console.error('Backend health check failed:', err);
+        setError(`Backend connection error: ${err.message}`);
+      }
+    };
+    
+    testBackend();
+  }, []);
+
   const updateAllTagsAndPlayers = (sessionsData) => {
     const tags = new Set();
     const players = new Set();

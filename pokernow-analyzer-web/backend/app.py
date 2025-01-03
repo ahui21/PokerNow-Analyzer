@@ -6,6 +6,8 @@ from typing import List, Union
 from services.file_processor import FileProcessor
 from services.supabase_service import SupabaseService
 from pydantic import BaseModel, validator
+from fastapi.responses import JSONResponse
+from datetime import datetime
 
 app = FastAPI()
 
@@ -146,4 +148,35 @@ async def toggle_session_active(session_id: int, update: ActiveUpdate):
 
 @app.get("/healthcheck")
 async def healthcheck():
-    return {"status": "ok"}
+    try:
+        # Test Supabase connection
+        await supabase_service.get_sessions()
+        return JSONResponse(
+            content={
+                "status": "ok",
+                "message": "Backend is running and Supabase connection is working",
+                "timestamp": str(datetime.now()),
+                "environment": os.getenv('VERCEL_ENV', 'development')
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Backend is running but Supabase connection failed",
+                "error": str(e),
+                "timestamp": str(datetime.now()),
+                "environment": os.getenv('VERCEL_ENV', 'development')
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
