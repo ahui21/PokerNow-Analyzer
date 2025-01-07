@@ -12,6 +12,7 @@ class PlayerStats:
     four_bet_hands: int = 0
     five_bet_hands: int = 0
     showdown_hands: int = 0
+    flop_hands: int = 0
     total_bets: int = 0
     total_raises: int = 0
     total_calls: int = 0
@@ -48,6 +49,7 @@ class PlayerStats:
             'three_bet_hands': 0,
             'four_bet_hands': 0,
             'five_bet_hands': 0,
+            'flop_hands': 0,
             'total_bets': 0,
             'total_raises': 0,
             'total_calls': 0
@@ -119,7 +121,9 @@ class PokerAnalyzer:
         game_type = 'NLHE'  # Default to NLHE
         table_size = 0
         current_street = 'preflop'
-
+        flop_players = set()
+        folded_players = set()  # Track folded players
+        
         current_preflop = 1
         
         # First pass: get hand ID, players, and context
@@ -143,13 +147,16 @@ class PokerAnalyzer:
                         self.current_hand_players.add(player)
         
             # Track street changes
-            if "*** flop ***" in text:
+            if "flop:" in text.lower():
                 current_street = 'flop'
+                # Add all players who haven't folded to flop_players
+                flop_players = self.current_hand_played - folded_players
+                print(f"DEBUG: Players who see flop: {flop_players}")  # Debug print
                 continue
-            elif "*** turn ***" in text:
+            elif "turn:" in text.lower():
                 current_street = 'turn'
                 continue
-            elif "*** river ***" in text:
+            elif "river:" in text.lower():
                 current_street = 'river'
                 continue
             
@@ -157,6 +164,15 @@ class PokerAnalyzer:
             player = self.extract_player_name(text)
             if not player:
                 continue
+
+            # Track preflop actions to determine who sees the flop
+            if current_street == 'preflop':
+                if "calls" in text or "raises" in text or "bets" in text or "posts" in text:  # Added "posts"
+                    self.current_hand_played.add(player)
+                elif "folds" in text:
+                    folded_players.add(player)
+                    if player in self.current_hand_played:
+                        self.current_hand_played.remove(player)
 
             # Track actions
             if "shows" in text:
@@ -205,8 +221,9 @@ class PokerAnalyzer:
                 if current_street == 'preflop':
                     self.current_hand_played.add(player)
 
+        # Define combined_key before using it
         combined_key = f"{game_type}_{table_size}h"
-
+        
         # Update stats for all contexts
         for player in self.current_hand_players:
             # Update main stats
@@ -287,6 +304,22 @@ class PokerAnalyzer:
             # Update combined stats
             self.players[player].combined_stats[combined_key]['five_bet_hands'] += 1
 
+        # After the loop, update flop hands stats
+        print(f"DEBUG: Final flop players: {flop_players}")  # Debug print
+        for player in flop_players:
+            print(f"DEBUG: Updating flop hands for {player}")  # Debug print
+            # Update main stats
+            self.players[player].flop_hands += 1
+            
+            # Update game type stats
+            self.players[player].game_type_stats[game_type]['flop_hands'] += 1
+            
+            # Update table size stats
+            self.players[player].table_size_stats[table_size]['flop_hands'] += 1
+            
+            # Update combined stats
+            self.players[player].combined_stats[combined_key]['flop_hands'] += 1
+
     def parse_log(self, filename: str) -> None:
         """Parse the entire log file."""
         with open(filename, 'r', encoding='utf-8') as f:
@@ -326,11 +359,12 @@ class PokerAnalyzer:
             'PFR': (stats['preflop_raise_hands'] / stats['total_hands']) * 100,
             'VPIP': (stats['hands_played'] / stats['total_hands']) * 100,
             'AF': (stats['total_bets'] + stats['total_raises']) / (stats['total_calls'] or 1),
-            'WTSD': (stats['showdown_hands'] / stats['total_hands']) * 100,
+            'WTSD': (stats['showdown_hands'] / stats['flop_hands'] * 100) if stats['flop_hands'] > 0 else 0,
             'Hands': stats['total_hands'],
             'Hands Played': stats['hands_played'],
             'Preflop Raises': stats['preflop_raise_hands'],
             'Showdowns': stats['showdown_hands'],
+            'Flop Hands': stats['flop_hands'],
             'Bets': stats['total_bets'],
             'Raises': stats['total_raises'],
             'Calls': stats['total_calls'],
@@ -388,11 +422,12 @@ class PokerAnalyzer:
             'PFR': (data.preflop_raise_hands / data.total_hands) * 100,
             'VPIP': (data.hands_played / data.total_hands) * 100,
             'AF': (data.total_bets + data.total_raises) / (data.total_calls or 1),
-            'WTSD': (data.showdown_hands / data.total_hands) * 100,
+            'WTSD': (data.showdown_hands / data.flop_hands * 100) if data.flop_hands > 0 else 0,
             'Hands': data.total_hands,
             'Hands Played': data.hands_played,
             'Preflop Raises': data.preflop_raise_hands,
             'Showdowns': data.showdown_hands,
+            'Flop Hands': data.flop_hands,
             'Bets': data.total_bets,
             'Raises': data.total_raises,
             'Calls': data.total_calls,
@@ -403,6 +438,8 @@ class PokerAnalyzer:
 
 if __name__ == "__main__":
     import sys
+    import csv
+    from typing import List, Dict
     
     if len(sys.argv) != 2:
         print("Usage: python poker_analyzer.py <pokernow_log_file>")
@@ -413,61 +450,57 @@ if __name__ == "__main__":
     
     stats = analyzer.get_stats()
     
+    # Define CSV headers
+    headers = [
+        'Name',
+        'Game Type',
+        'Table Size',
+        'Hands',
+        'Hands Played',
+        'Hands PFR',
+        'Hands Flop',
+        'Hands Showdown',
+        'Bets',
+        'Raises',
+        'Calls',
+        '3Bets',
+        '4Bets',
+        '5Bets'
+    ]
+    
+    # Prepare rows for CSV
+    rows = []
     for player, contexts in sorted(stats.items()):
-        print(f"Stats for {player}:")
-        
-        '''# Print overall stats
-        print("\nOverall:")
-        overall = contexts['overall']
-        print(f"VPIP: {overall['VPIP']:.1f}%")
-        print(f"PFR: {overall['PFR']:.1f}%")
-        print(f"AF: {overall['AF']:.2f}")
-        print(f"WTSD: {overall['WTSD']:.1f}%")
-        print(f"Total Hands: {overall['Hands']}")
-        
-        # Print game type stats
-        print("\nBy Game Type:")
-        for game_type, game_stats in contexts['by_game_type'].items():
-            print(f"\n{game_type}:")
-            print(f"VPIP: {game_stats['VPIP']:.1f}%")
-            print(f"PFR: {game_stats['PFR']:.1f}%")
-            print(f"AF: {game_stats['AF']:.2f}")
-            print(f"WTSD: {game_stats['WTSD']:.1f}%")
-            print(f"Total Hands: {game_stats['Hands']}")
-        
-        # Print table size stats
-        print("\nBy Table Size:")
-        for size, size_stats in contexts['by_table_size'].items():
-            print(f"\n{size}:")
-            print(f"VPIP: {size_stats['VPIP']:.1f}%")
-            print(f"PFR: {size_stats['PFR']:.1f}%")
-            print(f"AF: {size_stats['AF']:.2f}")
-            print(f"WTSD: {size_stats['WTSD']:.1f}%")
-            print(f"Total Hands: {size_stats['Hands']}")
-        
-        # Print combined stats
-        print("\nBy Combined Context:")
         for context, combined_stats in contexts['by_combined'].items():
-            print(f"\n{context}:")
-            print(f"VPIP: {combined_stats['VPIP']:.1f}%")
-            print(f"PFR: {combined_stats['PFR']:.1f}%")
-            print(f"AF: {combined_stats['AF']:.2f}")
-            print(f"WTSD: {combined_stats['WTSD']:.1f}%")
-            print(f"Total Hands: {combined_stats['Hands']}")'''
-        
-        # Print combined stats
-        ##print("\nBy Combined Context:")
-        for context, combined_stats in contexts['by_combined'].items():
-            print(f"{context}:")
-            print(f"Hands Dealt: {combined_stats['Hands']:.0f}")
-            print(f"Hands Played: {combined_stats['Hands Played']:.0f}")
-            print(f"Hands PFR: {combined_stats['Preflop Raises']:.0f}")
-            print(f"Hands Showdown: {combined_stats['Showdowns']:.0f}")
-            print(f"Hands Bet: {combined_stats['Bets']:.0f}")
-            print(f"Hands Raised: {combined_stats['Raises']:.0f}")
-            print(f"Hands Called: {combined_stats['Calls']:.0f}")
-            print(f"Hands 3Bets: {combined_stats['3Bets']:.0f}")
-            print(f"Hands 4Bets: {combined_stats['4Bets']:.0f}")
-            print(f"Hands 5Bets: {combined_stats['5Bets']:.0f}")
-
-        print("--------------------------------")
+            # Parse game type and table size from context (e.g., "NLHE_9h")
+            game_type, table_info = context.split('_')
+            table_size = table_info[:-1]  # Remove the 'h' suffix
+            
+            # Only add row if there are hands played
+            if combined_stats['Hands'] > 0:
+                row = [
+                    player,
+                    game_type,
+                    table_size,
+                    int(combined_stats['Hands']),
+                    int(combined_stats['Hands Played']),
+                    int(combined_stats['Preflop Raises']),
+                    int(combined_stats['Flop Hands']),
+                    int(combined_stats['Showdowns']),
+                    int(combined_stats['Bets']),
+                    int(combined_stats['Raises']),
+                    int(combined_stats['Calls']),
+                    int(combined_stats['3Bets']),
+                    int(combined_stats['4Bets']),
+                    int(combined_stats['5Bets'])
+                ]
+                rows.append(row)
+    
+    # Write to CSV
+    output_file = 'stats.csv'
+    with open(output_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerows(rows)
+    
+    print(f"Stats written to {output_file}")

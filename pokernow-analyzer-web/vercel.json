@@ -2,12 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.9"
-      }
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
     },
     {
       "src": "frontend/package.json",
@@ -24,11 +20,5 @@
       "src": "/(.*)",
       "dest": "/frontend/build/$1"
     }
-  ],
-  "functions": {
-    "api/index.py": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  }
+  ]
 } 
